@@ -251,6 +251,18 @@ public partial class Client : IDisposable, IInputManagement
 
     private readonly Stopwatch m_sleepTimer = new();
     private TimeSpan m_maxJitter = new(0);
+
+/// TODO: Deal with Mac and FreeBSD edgecases.  See SDLControllerWrapper in the Helion
+/// repo for how this is usually handled.
+#if LINUX
+    internal const string SDLLibraryName = "libSDL2.so";
+#else
+    internal const string SDLLibraryName = "SDL2.dll";
+#endif
+
+
+    [DllImport(SDLLibraryName, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+    public static extern int SDL_Delay(long ms);
     private void Window_MainLoop(FrameEventArgs frameEventArgs)
     {
         m_window.JoystickAdapter.Poll();
@@ -266,7 +278,7 @@ public partial class Client : IDisposable, IInputManagement
         Render();
 
         m_sleepTimer.Start();
-        Thread.Sleep(1);
+        SDL_Delay(1);
         m_sleepTimer.Stop();
         TimeSpan jitter = m_sleepTimer.Elapsed;
         if (jitter > m_maxJitter)
