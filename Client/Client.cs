@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Helion.Audio;
 using Helion.Audio.Impl;
@@ -248,6 +249,8 @@ public partial class Client : IDisposable, IInputManagement
         m_profiler.Render.Total.Stop();
     }
 
+    private readonly Stopwatch m_sleepTimer = new();
+    private TimeSpan m_maxJitter = new(0);
     private void Window_MainLoop(FrameEventArgs frameEventArgs)
     {
         m_window.JoystickAdapter.Poll();
@@ -261,6 +264,17 @@ public partial class Client : IDisposable, IInputManagement
 
         RunLogic();
         Render();
+
+        m_sleepTimer.Start();
+        Thread.Sleep(1);
+        m_sleepTimer.Stop();
+        TimeSpan jitter = m_sleepTimer.Elapsed;
+        if (jitter > m_maxJitter)
+        {
+            m_maxJitter = jitter;
+            Log.Info($"New max sleep jitter: {jitter}");
+        }
+        m_sleepTimer.Reset();
 
         m_soundManager.Update();
 
