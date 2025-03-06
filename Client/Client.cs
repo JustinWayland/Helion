@@ -250,6 +250,7 @@ public partial class Client : IDisposable, IInputManagement
     }
 
     private readonly Stopwatch m_sleepTimer = new();
+    private readonly Stopwatch m_currentMaxJitter = new();
     private TimeSpan m_maxJitter = new(0);
 
 /// TODO: Deal with Mac and FreeBSD edgecases.  See SDLControllerWrapper in the Helion
@@ -287,6 +288,17 @@ public partial class Client : IDisposable, IInputManagement
             Log.Info($"New max sleep jitter: {jitter}");
         }
         m_sleepTimer.Reset();
+
+        if (!m_currentMaxJitter.IsRunning)
+        {
+            m_currentMaxJitter.Start();
+        }
+        else if (m_currentMaxJitter.Elapsed.Seconds > 5)
+        {
+            m_maxJitter = new TimeSpan(0);
+            m_currentMaxJitter.Restart();
+        }
+
 
         m_soundManager.Update();
 
