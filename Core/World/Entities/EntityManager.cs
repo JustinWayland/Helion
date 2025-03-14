@@ -3,6 +3,7 @@ using Helion.Geometry.Vectors;
 using Helion.Maps;
 using Helion.Maps.Components;
 using Helion.Maps.Shared;
+using Helion.Maps.Specials.ZDoom;
 using Helion.Models;
 using Helion.Util;
 using Helion.Util.Container;
@@ -25,16 +26,10 @@ public class EntityManager : IDisposable
 {
     public record class EntityModelPair(EntityModel Model, Entity Entity);
 
-    public class WorldModelPopulateResult
+    public class WorldModelPopulateResult(IList<Player> players, Dictionary<int, EntityModelPair> entities)
     {
-        public WorldModelPopulateResult(IList<Player> players, Dictionary<int, EntityModelPair> entities)
-        {
-            Players = players;
-            Entities = entities;
-        }
-
-        public IList<Player> Players;
-        public Dictionary<int, EntityModelPair> Entities;
+        public IList<Player> Players = players;
+        public Dictionary<int, EntityModelPair> Entities = entities;
     }
 
     public const int NoTid = 0;
@@ -63,7 +58,7 @@ public class EntityManager : IDisposable
 
     private static bool ZHeightSet(double z)
     {
-        return z != Fixed.Lowest().ToDouble() && z != 0.0;
+        return z != double.MinValue && z != 0.0;
     }
 
     public IEnumerable<Entity> FindByTid(int tid)
@@ -190,8 +185,8 @@ public class EntityManager : IDisposable
             if (mapThing.EditorNumber == (int)EditorId.MusicChangerStart)
                 continue;
 
-            bool isMusicChanger = EditorIds.IsMusicChanger(mapThing.EditorNumber);
-            EntityDefinition? definition = isMusicChanger ? 
+            var isMusicChanger = EditorIds.IsMusicChanger(mapThing.EditorNumber);
+            var definition = isMusicChanger ? 
                 DefinitionComposer.GetByName(Constants.MusicChanger) : DefinitionComposer.GetByID(mapThing.EditorNumber);
             if (definition == null)
             {
@@ -210,22 +205,43 @@ public class EntityManager : IDisposable
             if (definition.Flags.CountItem)
                 levelStats.TotalItems++;
 
-            double angleRadians = MathHelper.ToRadians(mapThing.Angle);
-            Vec3D position = mapThing.Position.Double;
+            var angleRadians = MathHelper.ToRadians(mapThing.Angle);
+            var position = mapThing.Position;
             // position.Z is the potential zHeight variable, not the actual z position. We need to pass it to Create to ensure the zHeight is set
-            Entity entity = Create(definition, position, position.Z, angleRadians, mapThing.ThingId, initSpawn: true);
+            var entity = Create(definition, position, position.Z, angleRadians, mapThing.ThingId, initSpawn: true);
+            entity.Special = mapThing.Special;
+            entity.Args = mapThing.Args;
+            entity.Gravity = mapThing.Gravity;
+
+            if (mapThing.Alpha.HasValue)
+                entity.Alpha = mapThing.Alpha.Value;
+
             if (mapThing.Flags.Ambush)
                 entity.Flags.Ambush = mapThing.Flags.Ambush;
             if (mapThing.Flags.Friendly)
                 entity.Flags.Friendly = mapThing.Flags.Friendly;
+            if (mapThing.Flags.Invisible)
+                entity.Flags.Invisible = mapThing.Flags.Invisible;
+            if (mapThing.Flags.CountKill)
+                entity.Flags.CountKill = mapThing.Flags.CountKill;
+            if (mapThing.Flags.CountItem)
+                entity.Flags.CountItem = mapThing.Flags.CountItem;
+            if (mapThing.Flags.Dormant)
+                entity.Flags.Dormant = mapThing.Flags.Dormant;
+            if (mapThing.Health.HasValue)
+                entity.Health = mapThing.Health.Value;
+
+            if (mapThing.Flags.CountSecret)
+            {
+                entity.Flags.CountSecret = mapThing.Flags.CountSecret;
+                levelStats.TotalSecrets++;
+            }
 
             if (entity.FrameState.Frame.Ticks > 0)
                 entity.FrameState.SetTics((World.Random.NextByte() % entity.FrameState.Frame.Ticks) + 1);
 
             if (!entity.Flags.ActLikeBridge && ZHeightSet(position.Z))
                 relinkEntities.Add(entity);
-
-            PostProcessEntity(entity);
 
             if (isMusicChanger)
                 entity.ThingId = mapThing.EditorNumber - (int)EditorId.MusicChangerStart;
@@ -348,7 +364,6 @@ public class EntityManager : IDisposable
             setOnGround = pair.Model.OnGround;
         }
 
-        PostProcessEntity(entity);
         FinalizeEntity(entity, false, initSpawn: false);
         if (setOnGround != null)
             entity.OnGround = setOnGround.Value;
@@ -423,14 +438,24 @@ public class EntityManager : IDisposable
             return true;
 
         // TODO: These should be offloaded into SinglePlayerWorld...
-        if (mapThing.Flags.MultiPlayer)
-            return false;
+        if (World.MapType == MapType.Doom)
+        {
+            if (mapThing.Flags.MultiPlayer)
+                return false;
+        }
+        else
+        {
+            if (!mapThing.Flags.SinglePlayer)
+                return false;
+        }
 
         return (SkillLevel)World.SkillDefinition.SpawnFilter switch
         {
-            SkillLevel.VeryEasy or SkillLevel.Easy => mapThing.Flags.Easy,
-            SkillLevel.Medium => mapThing.Flags.Medium,
-            SkillLevel.Hard or SkillLevel.Nightmare => mapThing.Flags.Hard,
+            SkillLevel.VeryEasy => mapThing.Flags.Skill1,
+            SkillLevel.Easy => mapThing.Flags.Skill2,
+            SkillLevel.Medium => mapThing.Flags.Skill3,
+            SkillLevel.Hard => mapThing.Flags.Skill4,
+            SkillLevel.Nightmare => mapThing.Flags.Skill5,
             _ => false,
         };
     }
@@ -480,10 +505,7 @@ public class EntityManager : IDisposable
 
         if (entity.Definition.Name.EqualsIgnoreCase(Constants.MusicChanger))
             MusicChangers.Add(entity);
-    }
 
-    private void PostProcessEntity(Entity entity)
-    {
         SpawnLocations.AddPossibleSpawnLocation(entity);
 
         if (entity.ThingId != NoTid)

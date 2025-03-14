@@ -20,7 +20,7 @@ namespace Helion.Geometry.Segments
 
         public Vec2D Delta;
         public Box2D Box;
-        public double Length => Start.Distance(End);
+        public double Length() => Start.Distance(End);
         public bool IsAxisAligned => Start.X.ApproxEquals(End.X) || Start.Y.ApproxEquals(End.Y);
         public IEnumerable<Vec2D> Vertices => GetVertices();
 
@@ -188,12 +188,12 @@ namespace Helion.Geometry.Segments
             double areaStart = ((startX - segEndX) * (endY - segEndY)) - ((startY - segEndY) * (endX - segEndX));
             double areaEnd = ((startX - segStartX) * (endY - segStartY)) - ((startY - segStartY) * (endX - segStartX));
 
-            if (areaStart * areaEnd < 0)
+            if (areaStart * areaEnd <= 0)
             {
                 double areaThisStart = ((segStartX - startX) * (segEndY - startY)) - ((segStartY - startY) * (segEndX - startX));
                 double areaThisEnd = ((segStartX - endX) * (segEndY - endY)) - ((segStartY - endY) * (segEndX - endX));
 
-                if (areaThisStart * areaThisEnd < 0)
+                if (areaThisStart * areaThisEnd <= 0)
                 {
                     t = areaThisStart / (areaThisStart - areaThisEnd);
                     return t >= 0 && t <= 1;
@@ -213,12 +213,12 @@ namespace Helion.Geometry.Segments
             double areaStart = ((startX - segEndX) * (endY - segEndY)) - ((startY - segEndY) * (endX - segEndX));
             double areaEnd = ((startX - segStartX) * (endY - segStartY)) - ((startY - segStartY) * (endX - segStartX));
 
-            if (areaStart * areaEnd < 0)
+            if (areaStart * areaEnd <= 0)
             {
                 double areaThisStart = ((segStartX - startX) * (segEndY - startY)) - ((segStartY - startY) * (segEndX - startX));
                 double areaThisEnd = ((segStartX - endX) * (segEndY - endY)) - ((segStartY - endY) * (segEndX - endX));
 
-                if (areaThisStart * areaThisEnd < 0)
+                if (areaThisStart * areaThisEnd <= 0)
                 {
                     t = areaThisStart / (areaThisStart - areaThisEnd);
                     return t >= 0 && t <= 1;
